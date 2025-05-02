@@ -1,6 +1,6 @@
 // index.js
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Events, Collection, InteractionType } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Events, Collection } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -10,6 +10,7 @@ const client = new Client({
 });
 
 client.commands = new Collection();
+client.interactions = new Collection();
 
 // Load command files
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
@@ -19,11 +20,12 @@ for (const file of commandFiles) {
 }
 
 // Load interaction handlers
-client.interactions = new Collection();
 const interactionFiles = fs.readdirSync('./interactions').filter(file => file.endsWith('.js'));
 for (const file of interactionFiles) {
   const handler = require(`./interactions/${file}`);
-  client.interactions.set(handler.customId, handler);
+  if (handler.customId && typeof handler.execute === 'function') {
+    client.interactions.set(handler.customId, handler);
+  }
 }
 
 client.once('ready', async () => {
@@ -36,36 +38,33 @@ client.once('ready', async () => {
     const messagePayload = generateClubroomRequestMessage();
     await targetChannel.send(messagePayload);
   }
+
+  const { generateCollabButtonMessage } = require('./interactions/collabthreadHandler');
+  const collabChannel = await client.channels.fetch('1366718740351418400');
+  await collabChannel.send(generateCollabButtonMessage());
 });
 
 client.on(Events.InteractionCreate, async interaction => {
-    console.log('🧩 Interaction received:', interaction.customId);
-  if (interaction.isChatInputCommand()) {
-    const command = client.commands.get(interaction.commandName);
-    if (!command) return;
-    try {
-      await command.execute(interaction);
-    } catch (error) {
-      console.error(error);
-      await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
-    }
-  } else {
-    for (const [id, handler] of client.interactions.entries()) {
-      if (interaction.customId.startsWith(id)) {
-        try {
-          await handler.execute(interaction);
-        } catch (error) {
-          console.error(error);
-          if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: 'An error occurred.', ephemeral: true });
-          } else {
-            await interaction.reply({ content: 'An error occurred.', ephemeral: true });
-          }
-        }
-        break;
-      }
+  const baseId = interaction.customId?.split(':')[0] || interaction.commandName;
+  const handler = interaction.isChatInputCommand()
+    ? client.commands.get(baseId)
+    : client.interactions.get(baseId);
+
+  if (!handler || typeof handler.execute !== 'function') return;
+
+  try {
+    await handler.execute(interaction);
+  } catch (error) {
+    console.error(`❌ Error in interaction [${baseId}]:`, error);
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({ content: 'An error occurred.', ephemeral: true });
+    } else {
+      await interaction.reply({ content: 'An error occurred.', ephemeral: true });
     }
   }
 });
+
+const { checkReactions } = require('./interactions/collabthreadHandler');
+setInterval(() => checkReactions(client), 60 * 1000); // every 1 minute
 
 client.login(process.env.DISCORD_TOKEN);
