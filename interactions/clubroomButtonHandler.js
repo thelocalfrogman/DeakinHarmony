@@ -30,22 +30,27 @@ module.exports = {
   generateClubroomRequestMessage: () => ({
     content: `# 🎓 **Request a Private Clubroom**
   
-Need a space to collaborate with members of specific clubs? Use this tool to create a private text channel — or *clubroom* — that's only visible to the clubs you choose.
+  Need a space to collaborate with members of specific clubs? Use this tool to create a private text channel — or *clubroom* — that's only visible to the clubs you choose.
   
-Click the button below and:
-• Select up to **5 club roles** to invite
-• Provide a name for your new clubroom
+  ### How it works:
+  1. Click the **Request Clubroom** button below.
+  2. Use the **dropdown menus** to select up to **5 club roles per menu** (you can use more than one dropdown).
+  3. **Club options are listed in alphabetical order** to make them easier to find.
+  4. Click **✅ Confirm Selection** once you've chosen all the clubs you want to invite.
+  5. Enter a name for the channel in the popup form.
+  6. The bot will create the private channel and notify all invited clubs automatically.
   
-🔒 The bot will automatically create the private channel and notify the invited clubs.
+  🔒 Only members of the selected roles will be able to view and use the channel.
   
----
+  ---
   
-💡 **Need to invite more than 5 clubs?**  
-Use the slash command instead:
-\`/clubroom name: your-channel-name roles: DUCA, DESA, JASS, ...\`  
-You can type club names separated by commas. Make sure the acronym of the club and that it is spelled exactly as they appear in the server.
+  💡 **Need to invite more than 25 clubs?**  
+  💡 **Want to invite more than 5 clubs from the same dropdown menu?**  
+  Use the slash command instead:
+  \`/clubroom name: your-channel-name clubs: DUCA, DESA, JASS, ...\`  
+  Be sure to type the club names exactly as they appear in the server.
   
-If you run into any issues or need help, reach out to a Helper or Admin.`,
+  If you run into any issues or need help, reach out to a Helper or Admin.`,
     components: [
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()

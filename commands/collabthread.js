@@ -1,37 +1,78 @@
 // commands/collabthread.js
-const { SlashCommandBuilder, ChannelType } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
+const { supabase } = require('../utils/supabaseClient');
+const { fetchClubRoles } = require('../data/clubRoles');
+
+const HUB_CHANNEL_ID = '1366718740351418400'; // update this with your actual channel ID
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('collabthread')
-    .setDescription('Request a thread in #collaboration-hub')
+    .setDescription('Propose a collaboration idea between clubs')
     .addStringOption(option =>
-      option.setName('name')
-        .setDescription('Name of the thread')
+      option.setName('idea')
+        .setDescription('Brief description of the collaboration')
         .setRequired(true))
     .addStringOption(option =>
-      option.setName('message')
-        .setDescription('Message to include in the thread (optional)')
-        .setRequired(false)),
+      option.setName('clubs')
+        .setDescription('Comma-separated list of club acronyms or role mentions')
+        .setRequired(true)),
 
   async execute(interaction) {
-    const { guild, options, member } = interaction;
-    const threadName = options.getString('name');
-    const threadMessage = options.getString('message') || `${member} started this thread.`;
+    const idea = interaction.options.getString('idea');
+    const clubsInput = interaction.options.getString('clubs');
 
-    const collabHub = guild.channels.cache.find(c => c.name === 'collaboration-hub' && c.type === ChannelType.GuildText);
-    if (!collabHub) {
-      return interaction.reply({ content: 'Collaboration hub channel not found.', ephemeral: true });
+    if (!clubsInput) {
+      return interaction.reply({
+        content: '❌ You must provide a comma-separated list of clubs.',
+        ephemeral: true,
+      });
     }
 
-    const starterMessage = await collabHub.send(threadMessage);
+    const clubNames = clubsInput.split(',').map(c => c.trim().replace(/^<@&|>$/g, ''));
+    const allClubRoles = await fetchClubRoles();
 
-    const thread = await starterMessage.startThread({
-      name: threadName,
-      autoArchiveDuration: 1440,
-      reason: `Thread requested by ${member.user.tag}`,
+    const selectedRoles = allClubRoles.filter(role =>
+      clubNames.includes(role.value) || clubNames.includes(role.label) || clubNames.includes(role.id)
+    );
+
+    if (selectedRoles.length === 0) {
+      return interaction.reply({
+        content: '❌ None of the provided club names matched known clubs.',
+        ephemeral: true,
+      });
+    }
+
+    const { guild, user } = interaction;
+    const mentionList = selectedRoles.map(r => `<@&${r.id}>`).join(', ');
+    const hubChannel = await guild.channels.fetch(HUB_CHANNEL_ID).catch(() => null);
+
+    if (!hubChannel?.isTextBased?.()) {
+      return interaction.reply({
+        content: '❌ Collaboration hub channel is invalid or inaccessible.',
+        ephemeral: true,
+      });
+    }
+
+    const message = await hubChannel.send({
+      content: `📢 **New Collaboration Proposal** by <@${user.id}>\n💡 _${idea}_\n📣 Clubs invited: ${mentionList}\n✅ React with ✅ to show interest.`,
     });
 
-    await interaction.reply({ content: `Thread created: <#${thread.id}>`, ephemeral: true });
+    await message.react('✅');
+
+    await supabase.from('collab_proposals').insert({
+      user_id: user.id,
+      description: idea,
+      roles: selectedRoles.map(r => r.value),
+      timestamp: new Date().toISOString(),
+      message_id: message.id,
+      channel_created: false,
+      archived: false,
+    });
+
+    await interaction.reply({
+      content: `✅ Your idea has been posted in <#${HUB_CHANNEL_ID}>. Invited clubs have been notified.`,
+      ephemeral: true,
+    });
   },
 };
