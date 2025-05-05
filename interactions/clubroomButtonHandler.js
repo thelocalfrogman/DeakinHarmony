@@ -136,18 +136,18 @@ module.exports = {
         const clubRoles = await fetchClubRoles();
         const roleIds = selectedValues.map(val => clubRoles.find(r => r.value === val)?.id).filter(Boolean);
         const { guild, member } = interaction;
-
+      
         const categoryId = '1366309654929477720';
-
+      
         const overwrites = [
           {
             id: guild.roles.everyone,
             deny: [PermissionsBitField.Flags.ViewChannel],
           },
         ];
-
+      
         const mentionedRoles = [];
-
+      
         for (const roleId of roleIds) {
           const role = guild.roles.cache.get(roleId);
           if (role) {
@@ -158,7 +158,7 @@ module.exports = {
             mentionedRoles.push(role);
           }
         }
-
+      
         const newChannel = await guild.channels.create({
           name,
           type: ChannelType.GuildText,
@@ -166,17 +166,19 @@ module.exports = {
           permissionOverwrites: overwrites,
           reason: `Private clubroom requested by ${member.user.tag}`,
         });
-
+      
         const roleMentions = mentionedRoles.map(r => `<@&${r.id}>`).join(', ');
-        const welcomeMsg = `👋 Welcome! This clubroom was requested by <@${member.user.id}>.\nInvited roles: ${roleMentions}`;
+        const welcomeMsg = `👋 Welcome! This clubroom was requested by <@${member.user.id}>.\n> - 👉 Invited roles: ${roleMentions}`;
         await newChannel.send({ content: welcomeMsg });
-
+      
         userSelections.delete(member.user.id);
-
-        await interaction.reply({
-          content: `✅ Your private clubroom <#${newChannel.id}> has been created!`,
-          flags: 64,
-        });
+      
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: `✅ Your private clubroom <#${newChannel.id}> has been created!`,
+            flags: 64,
+          });
+        }
       }
     } catch (error) {
       console.error('❌ Error handling interaction in clubroom handler:', error);

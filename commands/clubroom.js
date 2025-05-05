@@ -44,7 +44,7 @@ module.exports = {
     });
 
     const roleMentions = mentionedRoles.map(r => `<@&${r.id}>`).join(', ');
-    const welcomeMsg = `👋 Welcome! This clubroom was requested by <@${member.user.id}>.\nInvited clubs: ${roleMentions}`;
+    const welcomeMsg = `👋 Welcome! This clubroom was requested by <@${member.user.id}>.\n> - 👉 Invited roles: ${roleMentions}`;
 
     await newChannel.send({ content: welcomeMsg });
 

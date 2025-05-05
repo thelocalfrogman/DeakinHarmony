@@ -83,65 +83,90 @@ async function execute(interaction) {
       ephemeral: true
     });
   } else if (interaction.customId === 'collabthread:confirm') {
-    const selectedValues = userSelections.get(interaction.user.id) || [];
-    if (selectedValues.length === 0) {
-      return await interaction.reply({ content: '⚠️ No roles selected.', ephemeral: true });
+  const selectedValues = userSelections.get(interaction.user.id) || [];
+  if (selectedValues.length === 0) {
+    return await interaction.reply({ content: '⚠️ No roles selected.', ephemeral: true });
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId(`collabthread:modal:${selectedValues.join(',')}`)
+    .setTitle('Submit Collaboration Idea');
+
+  const titleInput = new TextInputBuilder()
+    .setCustomId('title')
+    .setLabel('Title or Name of the Idea')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+
+  const descInput = new TextInputBuilder()
+    .setCustomId('description')
+    .setLabel('Brief description of the idea')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(titleInput),
+    new ActionRowBuilder().addComponents(descInput)
+  );
+
+  await interaction.showModal(modal);
+}
+
+else if (interaction.customId.startsWith('collabthread:modal:')) {
+  const title = interaction.fields.getTextInputValue('title');
+  const description = interaction.fields.getTextInputValue('description');
+  const selectedKeys = interaction.customId.split(':')[2].split(',');
+  const { user } = interaction;
+
+  const { error } = await supabase.from('collab_proposals').insert({
+    message_id: 'TEMP',
+    title,
+    description,
+    user_id: user.id,
+    roles: selectedKeys,
+    timestamp: new Date().toISOString(),
+    channel_created: false,
+    archived: false
+  });
+
+  if (error) {
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: '❌ DB error.', ephemeral: true });
     }
+    return;
+  }
 
-    const modal = new ModalBuilder()
-      .setCustomId(`collabthread:modal:${selectedValues.join(',')}`)
-      .setTitle('Submit Collaboration Idea');
+  const clubRoles = await fetchClubRoles();
+  const selectedRoles = clubRoles.filter(role => selectedKeys.includes(role.value));
+  const hubChannel = await interaction.guild.channels.fetch(HUB_CHANNEL_ID).catch(() => null);
 
-    const descInput = new TextInputBuilder()
-      .setCustomId('description')
-      .setLabel('Brief description of the idea')
-      .setStyle(TextInputStyle.Paragraph)
-      .setRequired(true);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(descInput));
-    await interaction.showModal(modal);
-  } else if (interaction.customId.startsWith('collabthread:modal:')) {
-    const description = interaction.fields.getTextInputValue('description');
-    const selectedKeys = interaction.customId.split(':')[2].split(',');
-    const { user } = interaction;
-
-    const { error } = await supabase.from('collab_proposals').insert({
-      message_id: 'TEMP',
-      description,
-      user_id: user.id,
-      roles: selectedKeys,
-      timestamp: new Date().toISOString(),
-      channel_created: false,
-      archived: false
-    });
-
-    if (error) return interaction.reply({ content: '❌ DB error.', ephemeral: true });
-
-    const clubRoles = await fetchClubRoles();
-    const selectedRoles = clubRoles.filter(role => selectedKeys.includes(role.value));
-    const hubChannel = await interaction.guild.channels.fetch(HUB_CHANNEL_ID).catch(() => null);
-
-    if (!hubChannel?.isTextBased?.()) {
-      return interaction.reply({
+  if (!hubChannel?.isTextBased?.()) {
+    if (!interaction.replied && !interaction.deferred) {
+      return await interaction.reply({
         content: '❌ Collaboration hub channel is invalid or inaccessible.',
         flags: 64,
       });
     }
+    return;
+  }
 
-    const mentionList = selectedRoles.map(r => `<@&${r.id}>`).join(', ');
+  const mentionList = selectedRoles.map(r => `<@&${r.id}>`).join(', ');
 
-    const message = await hubChannel.send({
-      content: `📢 **New Collaboration Proposal** by <@${user.id}>\n💡 _${description}_\n📣 Clubs invited: ${mentionList}\n✅ React with ✅ to show interest.`
-    });
+  const message = await hubChannel.send({
+    content: `📢 **${title}** by <@${user.id}>\n> 💡 _${description}_\n> 📣 Clubs invited: ${mentionList}\n> ✅ React with ✅ to show interest.`
+  });
 
-    await message.react('✅');
-    await supabase.from('collab_proposals')
-      .update({ message_id: message.id })
-      .match({ user_id: user.id, description });
+  await message.react('✅');
+  await supabase.from('collab_proposals')
+    .update({ message_id: message.id })
+    .match({ user_id: user.id, description });
 
-    userSelections.delete(user.id);
+  userSelections.delete(user.id);
+
+  if (!interaction.replied && !interaction.deferred) {
     await interaction.reply({ content: '✅ Collaboration proposal submitted!', ephemeral: true });
   }
+}
 }
 
 // checkReactions function remains unchanged
@@ -205,11 +230,12 @@ async function checkReactions(client) {
         const matchedRoles = proposal.roles.map(val => clubRolesMap.find(r => r.value === val)).filter(Boolean);
         const mentions = matchedRoles.map(r => `<@&${r.id}>`).join(', ');
 
-        const summary = `📌 **Collaboration Channel Created**
-🧠 **Idea**: ${proposal.description}
-👥 **Invited Clubs**: ${mentions}
+        const summary = `
+        📌 **Collaboration Channel Created**
+        > - 🧠 **Idea**: ${proposal.description}
+        > - 👥 **Invited Clubs**: ${mentions}
 
-If you would like to change the name of this channel, the user who posted the collaboration idea can use the \`/rename-collab\` command.`;
+        If you would like to change the name of this channel, the user who posted the collaboration idea can use the \`/rename-collab\` command.`;
         const pinMessage = await newChannel.send(summary);
         await pinMessage.pin().catch(() => {});
 
