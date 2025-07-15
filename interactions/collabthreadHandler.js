@@ -153,7 +153,8 @@ else if (interaction.customId.startsWith('collabthread:modal:')) {
   const mentionList = selectedRoles.map(r => `<@&${r.id}>`).join(', ');
 
   const message = await hubChannel.send({
-    content: `📢 **${title}** by <@${user.id}>\n> 💡 _${description}_\n> 📣 Clubs invited: ${mentionList}\n> ✅ React with ✅ to show interest.`
+    content: `📢 **${title}** by <@${user.id}>\n> 💡 _${description}_\n> 📣 Clubs invited: ${mentionList}\n> ✅ React with ✅ to show interest.\n### If you want to propose your own collaboration, use the button below!`,
+    components: [generateCollabButtonMessage().components[0]],
   });
 
   await message.react('✅');
