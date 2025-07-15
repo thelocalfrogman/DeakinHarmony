@@ -2,6 +2,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { supabase } = require('../utils/supabaseClient');
 const { fetchClubRoles } = require('../data/clubRoles');
+const { generateCollabButtonMessage } = require('../interactions/collabthreadHandler');
 
 const HUB_CHANNEL_ID = '1366718740351418400'; // update this with your actual channel ID
 
@@ -54,8 +55,12 @@ module.exports = {
       });
     }
 
+    // Use the same button as in collabthreadHandler.js
+    const collabButton = generateCollabButtonMessage().components[0];
+
     const message = await hubChannel.send({
-      content: `📢 **New Collaboration Proposal** by <@${user.id}>\n💡 _${idea}_\n📣 Clubs invited: ${mentionList}\n✅ React with ✅ to show interest.`,
+      content: `📢 **New Collaboration Proposal** by <@${user.id}>\n💡 _${idea}_\n📣 Clubs invited: ${mentionList}\n✅ React with ✅ to show interest.\n### If you want to propose your own collaboration, use the button below!`,
+      components: [collabButton],
     });
 
     await message.react('✅');
